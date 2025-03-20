@@ -1,18 +1,21 @@
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chat_models import ChatOpenAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import ConversationalRetrievalChain
 import tempfile
 import os
 
 class RAGService:
-    def __init__(self, openai_api_key: str):
-        self.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+    def __init__(self, google_api_key: str):
+        self.embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=google_api_key
+        )
         self.vector_store = None
         self.chat_chain = None
-        self.openai_api_key = openai_api_key
+        self.google_api_key = google_api_key
 
     async def process_pdf(self, file: bytes):
         # Save the uploaded file temporarily
@@ -37,8 +40,12 @@ class RAGService:
                 embedding=self.embeddings
             )
 
-            # Initialize the chat chain
-            llm = ChatOpenAI(temperature=0, openai_api_key=self.openai_api_key)
+            # Initialize the chat chain with Gemini
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash-002",
+                google_api_key=self.google_api_key,
+                temperature=0.7
+            )
             self.chat_chain = ConversationalRetrievalChain.from_llm(
                 llm=llm,
                 retriever=self.vector_store.as_retriever()
@@ -53,5 +60,8 @@ class RAGService:
         if not self.chat_chain:
             raise ValueError("No documents have been processed yet")
         
-        response = self.chat_chain({"question": question, "chat_history": chat_history})
+        response = await self.chat_chain.ainvoke({
+            "question": question,
+            "chat_history": chat_history
+        })
         return response["answer"]
