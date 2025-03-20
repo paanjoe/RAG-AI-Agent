@@ -9,7 +9,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://rag-ai-agent-nyxuzdk4o-farhan-fazlis-projects.vercel.app/"  # Add your deployed frontend URL
+        "https://rag-ai-agent-nyxuzdk4o-farhan-fazlis-projects.vercel.app"  # Remove trailing slash
     ],
     allow_credentials=True,
     allow_methods=["*"],
