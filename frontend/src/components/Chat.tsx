@@ -40,7 +40,7 @@ export default function Chat() {
           <div
             key={i}
             className={`p-2 mb-2 rounded ${
-              message.isUser ? 'bg-blue-100 ml-auto' : 'bg-gray-100'
+              message.isUser ? 'bg-blue-100 ml-auto text-black' : 'bg-gray-100 text-black'
             } max-w-[80%]`}
           >
             {message.text}

@@ -5,7 +5,11 @@ from ..config import settings
 import io
 
 router = APIRouter()
-rag_service = RAGService(settings.google_api_key)
+rag_service = RAGService(
+    settings.google_api_key,
+    settings.supabase_url,
+    settings.supabase_service_key
+)
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
