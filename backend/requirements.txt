@@ -2,6 +2,7 @@ fastapi
 uvicorn
 python-multipart
 langchain
+langchain-community
 langchain-google-genai
 google-ai-generativelanguage
 supabase

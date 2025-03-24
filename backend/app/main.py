@@ -16,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(document.router)
+app.include_router(document.router, prefix="/api")
 
 @app.get("/")
 async def root():

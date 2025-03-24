@@ -4,6 +4,9 @@ const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
 });
 
+// Add this line for debugging
+console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
+
 export const uploadPDF = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
