@@ -84,15 +84,30 @@ class RAGService:
 
             # Create vectors and store them in Supabase
             for doc in splits:
-                vector = self.embeddings.embed_query(doc.page_content)
+                # Clean the text content
+                cleaned_content = doc.page_content.encode('ascii', 'ignore').decode('ascii')
+                
+                # Create embedding for cleaned content
+                vector = self.embeddings.embed_query(cleaned_content)
+                
+                # Clean metadata - ensure it's JSON serializable
+                cleaned_metadata = {
+                    'page': doc.metadata.get('page', 0),
+                    'source': doc.metadata.get('source', ''),
+                }
                 
                 # Insert document and its embedding
                 data = {
-                    'content': doc.page_content,
-                    'metadata': doc.metadata,
+                    'content': cleaned_content,
+                    'metadata': cleaned_metadata,
                     'embedding': vector
                 }
-                self.supabase.table('documents').insert(data).execute()
+                
+                try:
+                    self.supabase.table('documents').insert(data).execute()
+                except Exception as e:
+                    print(f"Error inserting document: {e}")
+                    continue
 
             # Initialize the chat chain with Gemini
             llm = ChatGoogleGenerativeAI(
@@ -101,7 +116,7 @@ class RAGService:
                 temperature=0.7
             )
             
-            # Create retriever instance with proper initialization
+            # Create retriever instance
             retriever = SupabaseRetriever(
                 supabase_client=self.supabase,
                 embeddings=self.embeddings
