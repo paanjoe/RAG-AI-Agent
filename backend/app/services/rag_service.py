@@ -1,66 +1,48 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain.schema import Document
 from langchain.schema.retriever import BaseRetriever
 from typing import List, Any
 from supabase import create_client, Client
-from pydantic import Field
-import numpy as np
+from pydantic import BaseModel, Field
+from fastapi import HTTPException
 import tempfile
 import os
 
-class SupabaseRetriever(BaseRetriever):
-    supabase_client: Client = Field(...)
-    embeddings: Any = Field(...)
+# Define a proper Pydantic model for the retriever
+class SupabaseRetriever(BaseRetriever, BaseModel):
+    supabase_client: Client = Field(..., description="Supabase client instance")
+    embeddings: Any = Field(..., description="Embeddings model instance")
 
     class Config:
         arbitrary_types_allowed = True
 
-    def __init__(self, supabase_client: Client, embeddings: Any, **kwargs):
-        super().__init__(supabase_client=supabase_client, embeddings=embeddings, **kwargs)
+    def _get_relevant_documents(self, query: str) -> List[Document]:
+        query_embedding = self.embeddings.embed_query(query)
+        
+        result = self.supabase_client.rpc(
+            'match_documents',
+            {'query_embedding': query_embedding, 'match_count': 5}
+        ).execute()
+        
+        docs = []
+        for item in result.data:
+            docs.append(Document(
+                page_content=item['content'],
+                metadata=item['metadata']
+            ))
+        return docs
 
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
-        query_vector = self.embeddings.embed_query(query)
-        
-        # Perform similarity search
-        result = self.supabase_client.rpc(
-            'match_documents',
-            {'query_embedding': query_vector, 'match_count': 5}
-        ).execute()
-        
-        # Convert to Document objects
-        docs = []
-        for item in result.data:
-            docs.append(Document(
-                page_content=item['content'],
-                metadata=item['metadata']
-            ))
-        return docs
-
-    def _get_relevant_documents(self, query: str) -> List[Document]:
-        query_vector = self.embeddings.embed_query(query)
-        
-        result = self.supabase_client.rpc(
-            'match_documents',
-            {'query_embedding': query_vector, 'match_count': 5}
-        ).execute()
-        
-        docs = []
-        for item in result.data:
-            docs.append(Document(
-                page_content=item['content'],
-                metadata=item['metadata']
-            ))
-        return docs
+        return self._get_relevant_documents(query)
 
 class RAGService:
     def __init__(self, google_api_key: str, supabase_url: str, supabase_service_key: str):
         self.embeddings = GoogleGenerativeAIEmbeddings(
             model="models/embedding-001",
-            google_api_key=google_api_key,
+            google_api_key=google_api_key
         )
         self.supabase = create_client(supabase_url, supabase_service_key)
         self.google_api_key = google_api_key
@@ -84,29 +66,22 @@ class RAGService:
 
             # Create vectors and store them in Supabase
             for doc in splits:
-                # Clean the text content
-                cleaned_content = doc.page_content.encode('ascii', 'ignore').decode('ascii')
-                
-                # Create embedding for cleaned content
-                vector = self.embeddings.embed_query(cleaned_content)
-                
-                # Clean metadata - ensure it's JSON serializable
-                cleaned_metadata = {
-                    'page': doc.metadata.get('page', 0),
-                    'source': doc.metadata.get('source', ''),
-                }
-                
-                # Insert document and its embedding
-                data = {
-                    'content': cleaned_content,
-                    'metadata': cleaned_metadata,
-                    'embedding': vector
-                }
-                
                 try:
+                    # Clean the text content
+                    content = doc.page_content.replace('\x00', '')
+                    cleaned_content = ''.join(char for char in content if ord(char) < 128)
+                    
+                    vector = self.embeddings.embed_query(cleaned_content)
+                    
+                    data = {
+                        'content': cleaned_content,
+                        'metadata': {'page': doc.metadata.get('page', 0)},
+                        'embedding': vector
+                    }
+                    
                     self.supabase.table('documents').insert(data).execute()
                 except Exception as e:
-                    print(f"Error inserting document: {e}")
+                    print(f"Error processing chunk: {str(e)}")
                     continue
 
             # Initialize the chat chain with Gemini
@@ -116,7 +91,7 @@ class RAGService:
                 temperature=0.7
             )
             
-            # Create retriever instance
+            # Create retriever instance with proper model initialization
             retriever = SupabaseRetriever(
                 supabase_client=self.supabase,
                 embeddings=self.embeddings
@@ -130,15 +105,18 @@ class RAGService:
             )
 
             return {"message": "PDF processed successfully"}
+        except Exception as e:
+            print(f"Error in process_pdf: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
         finally:
             os.unlink(tmp_path)
 
-    async def get_response(self, question: str, chat_history: list = []):
+    async def get_response(self, question: str) -> str:
         if not self.chat_chain:
             raise ValueError("No documents have been processed yet")
         
         response = await self.chat_chain.ainvoke({
             "question": question,
-            "chat_history": chat_history
+            "chat_history": []
         })
         return response["answer"]

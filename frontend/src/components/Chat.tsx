@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { sendMessage } from '@/lib/api';
+import api from '@/lib/api';
 
 type Message = {
   text: string;
@@ -23,10 +24,12 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const response = await sendMessage(userMessage);
-      setMessages(prev => [...prev, { text: response.response, isUser: false }]);
+      const response = await api.post('/chat', {
+        question: userMessage
+      });
+      setMessages(prev => [...prev, { text: response.data.response, isUser: false }]);
     } catch (error) {
-      console.error(error);
+      console.error('Error sending message:', error);
       setMessages(prev => [...prev, { text: 'Error getting response', isUser: false }]);
     } finally {
       setLoading(false);

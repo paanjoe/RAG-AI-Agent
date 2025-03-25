@@ -2,22 +2,29 @@
 
 import { useState } from 'react';
 import { uploadPDF } from '@/lib/api';
+import api from '@/lib/api';
 
 export default function FileUpload() {
   const [uploading, setUploading] = useState(false);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
-    
-    setUploading(true);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
     try {
-      await uploadPDF(e.target.files[0]);
-      alert('PDF uploaded and processed successfully!');
+      const response = await api.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      // Handle successful upload
+      console.log('Upload successful:', response.data);
     } catch (error) {
-      console.error(error);
-      alert('Error uploading PDF');
-    } finally {
-      setUploading(false);
+      console.error('Upload failed:', error);
+      // Handle error
     }
   };
 
