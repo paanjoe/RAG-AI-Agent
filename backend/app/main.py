@@ -1,17 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import document
+from app.routes import document
 
 app = FastAPI()
 
-# Configure CORS
+# More permissive CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://rag-ai-agent-nyxuzdk4o-farhan-fazlis-projects.vercel.app"  # Remove trailing slash
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=False,  # Must be False if allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )

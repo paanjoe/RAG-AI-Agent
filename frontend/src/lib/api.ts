@@ -5,6 +5,7 @@ const api = axios.create({
   headers: {
     'Accept': 'application/json',
   },
+  withCredentials: false,
 });
 
 // Add this line for debugging
