@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { sendMessage } from '@/lib/api';
 import api from '@/lib/api';
 
 type Message = {

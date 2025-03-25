@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { uploadPDF } from '@/lib/api';
 import api from '@/lib/api';
 
 export default function FileUpload() {
-  const [uploading, setUploading] = useState(false);
+  const [uploading] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
