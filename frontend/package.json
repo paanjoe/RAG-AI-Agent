@@ -12,29 +12,27 @@
   },
   "dependencies": {
     "axios": "^1.8.4",
-    "framer-motion": "^12.5.0",
+    "flowbite": "^2.3.0",
+    "flowbite-react": "^0.7.2",
     "next": "14.1.0",
     "react": "^18",
-    "react-dom": "^18",
-    "flowbite": "^2.3.0",
-    "flowbite-react": "^0.7.2"
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "autoprefixer": "^10.0.1",
-    "eslint": "^9",
-    "eslint-config-next": "15.2.3",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.5",
-    "postcss": "^8",
     "prettier": "^3.5.3",
-    "prettier-plugin-tailwindcss": "^0.6.11",
-    "tailwindcss": "^3.3.0",
-    "typescript": "^5"
+    "prettier-plugin-tailwindcss": "^0.6.11"
   }
 }
