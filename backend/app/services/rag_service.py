@@ -47,6 +47,7 @@ class RAGService:
         self.supabase = create_client(supabase_url, supabase_service_key)
         self.google_api_key = google_api_key
         self.chat_chain = None
+        self.chat_history = []
 
     async def process_pdf(self, file: bytes):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -117,6 +118,10 @@ class RAGService:
         
         response = await self.chat_chain.ainvoke({
             "question": question,
-            "chat_history": []
+            "chat_history": self.chat_history
         })
+        
+        # Update chat history
+        self.chat_history.append((question, response["answer"]))
+        
         return response["answer"]

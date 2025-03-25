@@ -16,22 +16,22 @@ export default function Chat() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-
-    const userMessage = input;
-    setInput('');
-    setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
-    setLoading(true);
-
     try {
+      setMessages(prev => [...prev, { text: input, isUser: true }]);
+      setInput('');
+      
       const response = await api.post('/chat', {
-        question: userMessage
+        question: input
       });
+      
       setMessages(prev => [...prev, { text: response.data.response, isUser: false }]);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setMessages(prev => [...prev, { text: 'Error getting response', isUser: false }]);
-    } finally {
-      setLoading(false);
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      // Show error message to user
+      setMessages(prev => [...prev, { 
+        text: error.response?.data?.detail || 'An error occurred. Please try uploading the PDF again.',
+        isUser: false
+      }]);
     }
   };
 
