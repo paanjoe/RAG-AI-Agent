@@ -1,45 +1,59 @@
 'use client';
 
+import { Button } from 'flowbite-react';
+
 import { useState } from 'react';
+
 import api from '@/lib/api';
 
 export default function FileUpload() {
-  const [uploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setFileName(file.name);
+    setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const response = await api.post('/upload', formData, {
+      await api.post('/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      // Handle successful upload
-      console.log('Upload successful:', response.data);
     } catch (error) {
       console.error('Upload failed:', error);
-      // Handle error
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md p-4 border rounded-lg">
-      <label className="block mb-2 text-sm font-medium">
-        Upload PDF
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={handleFileUpload}
-          disabled={uploading}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
-        />
-      </label>
-      {uploading && <p>Processing...</p>}
+    <div className="w-full rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+      <div className="flex items-center gap-4">
+        <Button disabled={uploading} color="gray">
+          <label className="cursor-pointer">
+            {uploading ? 'Uploading...' : 'Choose File'}
+            <input
+              type="file"
+              accept=".pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        </Button>
+        {fileName && (
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            Selected file: {fileName}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.services.rag_service import RAGService
@@ -16,6 +16,7 @@ class ChatRequest(BaseModel):
 @router.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),  # Use File(...) to properly handle multipart/form-data
+    x_api_key: str = Header(..., alias="X-API-Key")
 ):
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
@@ -23,11 +24,11 @@ async def upload_pdf(
     try:
         contents = await file.read()
         
-        # Initialize RAG service
+        # Initialize RAG service with user's API key but your Supabase credentials
         rag_service = RAGService(
-            google_api_key=settings.google_api_key,
-            supabase_url=settings.supabase_url,
-            supabase_service_key=settings.supabase_service_key
+            google_api_key=x_api_key,  # Use the user's API key
+            supabase_url=settings.supabase_url,  # Use your Supabase URL
+            supabase_service_key=settings.supabase_service_key  # Use your Supabase key
         )
         
         # Process the PDF
@@ -44,16 +45,27 @@ async def upload_pdf(
         await file.close()
 
 @router.post("/chat")
-async def chat(request: ChatRequest):  # Change parameter type
-    rag_service = app_state.get_rag_service()
-    if rag_service is None:
-        raise HTTPException(
-            status_code=400, 
-            detail="No PDF has been processed. Please upload a PDF first."
-        )
-    
+async def chat(
+    request: ChatRequest,
+    x_api_key: str = Header(..., alias="X-API-Key")
+):
     try:
-        response = await rag_service.get_response(request.question)
+        # Get existing RAG service or create new one
+        rag_service = app_state.get_rag_service()
+        
+        if not rag_service:
+            # Create new RAG service with user's API key but your Supabase credentials
+            rag_service = RAGService(
+                google_api_key=x_api_key,  # Use the user's API key
+                supabase_url=settings.supabase_url,  # Use your Supabase URL
+                supabase_service_key=settings.supabase_service_key  # Use your Supabase key
+            )
+            app_state.set_rag_service(rag_service)
+        else:
+            # Update the existing RAG service with the new API key
+            rag_service.google_api_key = x_api_key
+        
+        response = await rag_service.chat(request.question)
         return {"response": response}
     except Exception as e:
         print(f"Error in chat: {str(e)}")

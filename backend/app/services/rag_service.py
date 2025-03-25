@@ -4,12 +4,14 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 from langchain.chains import ConversationalRetrievalChain
 from langchain.schema import Document
 from langchain.schema.retriever import BaseRetriever
-from typing import List, Any
+from typing import List, Any, Tuple
 from supabase import create_client, Client
 from pydantic import BaseModel, Field
 from fastapi import HTTPException
 import tempfile
 import os
+from langchain.memory import ConversationBufferMemory
+from langchain_community.vectorstores.supabase import SupabaseVectorStore
 
 # Define a proper Pydantic model for the retriever
 class SupabaseRetriever(BaseRetriever, BaseModel):
@@ -46,8 +48,64 @@ class RAGService:
         )
         self.supabase = create_client(supabase_url, supabase_service_key)
         self.google_api_key = google_api_key
-        self.chat_chain = None
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=google_api_key,
+            temperature=0.7,
+            convert_system_message_to_human=True
+        )
         self.chat_history = []
+        self.retriever = None
+        self._initialize_retriever()
+
+    def _initialize_retriever(self):
+        try:
+            # Create a retriever from Supabase
+            self.retriever = SupabaseVectorStore(
+                self.supabase,
+                self.embeddings,
+                table_name="documents",
+                query_name="match_documents"
+            ).as_retriever(search_kwargs={"k": 3})
+        except Exception as e:
+            print(f"Error initializing retriever: {str(e)}")
+            raise
+
+    async def chat(self, question: str) -> str:
+        try:
+            if not self.retriever:
+                return "Please upload a document first."
+
+            # Create conversation chain if it doesn't exist
+            if not hasattr(self, 'conversation_chain'):
+                memory = ConversationBufferMemory(
+                    memory_key="chat_history",
+                    return_messages=True,
+                    output_key="answer"
+                )
+                
+                self.conversation_chain = ConversationalRetrievalChain.from_llm(
+                    llm=self.llm,
+                    retriever=self.retriever,
+                    memory=memory,
+                    return_source_documents=True,
+                    verbose=True
+                )
+
+            # Get response from conversation chain
+            response = await self.conversation_chain.ainvoke({
+                "question": question,
+                "chat_history": self.chat_history
+            })
+
+            # Update chat history with just the question and answer
+            self.chat_history.append((question, response['answer']))
+
+            return response['answer']
+
+        except Exception as e:
+            print(f"Error in chat: {str(e)}")
+            raise
 
     async def process_pdf(self, file: bytes):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -64,6 +122,11 @@ class RAGService:
                 chunk_overlap=200
             )
             splits = text_splitter.split_documents(documents)
+
+            # Clear existing documents using a proper WHERE clause
+            self.supabase.table('documents').delete().neq('id', 0).execute()
+            # Or alternatively:
+            # self.supabase.table('documents').delete().execute(count='exact')
 
             # Create vectors and store them in Supabase
             for doc in splits:
@@ -85,43 +148,13 @@ class RAGService:
                     print(f"Error processing chunk: {str(e)}")
                     continue
 
-            # Initialize the chat chain with Gemini
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash-002",
-                google_api_key=self.google_api_key,
-                temperature=0.7
-            )
+            # Reinitialize the retriever with new documents
+            self._initialize_retriever()
             
-            # Create retriever instance with proper model initialization
-            retriever = SupabaseRetriever(
-                supabase_client=self.supabase,
-                embeddings=self.embeddings
-            )
-
-            # Initialize the chat chain
-            self.chat_chain = ConversationalRetrievalChain.from_llm(
-                llm=llm,
-                retriever=retriever,
-                return_source_documents=True
-            )
-
             return {"message": "PDF processed successfully"}
+            
         except Exception as e:
-            print(f"Error in process_pdf: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            print(f"Error processing PDF: {str(e)}")
+            raise
         finally:
             os.unlink(tmp_path)
-
-    async def get_response(self, question: str) -> str:
-        if not self.chat_chain:
-            raise ValueError("No documents have been processed yet")
-        
-        response = await self.chat_chain.ainvoke({
-            "question": question,
-            "chat_history": self.chat_history
-        })
-        
-        # Update chat history
-        self.chat_history.append((question, response["answer"]))
-        
-        return response["answer"]
